@@ -1,0 +1,3 @@
+rootProject.name = 'inmem-cache'
+include 'smh'
+
