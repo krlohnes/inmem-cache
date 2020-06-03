@@ -44,6 +44,13 @@ public class ConcurrentHashMapExpiringCache<K, V> implements ExpiringCache<K, V>
         executorService.scheduleAtFixedRate(this::clean, 0L, 1L, TimeUnit.SECONDS);
     }
 
+    //For testing
+    protected ConcurrentHashMapExpiringCache(ConcurrentMap<K, ExpiringCacheEntry<K, V>> map) {
+        delayQueue = new DelayQueue();
+        this.map = map;
+        executorService = Executors.newSingleThreadScheduledExecutor();
+    }
+
     @Override
     public void put(K key, V value) {
         nullCheck(key, value);
@@ -72,7 +79,9 @@ public class ConcurrentHashMapExpiringCache<K, V> implements ExpiringCache<K, V>
         } else {
             long currentTime = System.currentTimeMillis();
             ExpiringCacheEntry<K, V> entry = map.get(key);
-            if (entry != null && currentTime >= entry.getExpirationTime()) {
+            if (entry != null &&
+                    (entry.getExpirationTime() == ExpiringCacheEntry.DO_NOT_EXPIRE ||
+                    currentTime <= entry.getExpirationTime())) {
                 return Optional.of(entry.getValue());
             } else {
                 return Optional.empty();
@@ -120,6 +129,7 @@ public class ConcurrentHashMapExpiringCache<K, V> implements ExpiringCache<K, V>
         }
     }
 }
+
 
 
 

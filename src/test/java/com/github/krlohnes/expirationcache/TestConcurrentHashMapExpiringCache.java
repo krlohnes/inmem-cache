@@ -1,6 +1,9 @@
 package com.github.krlohnes.expirationcache;
 
+import java.util.Map;
+import static org.mockito.Mockito.*;
 import java.util.Random;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -21,28 +24,28 @@ public class TestConcurrentHashMapExpiringCache {
             Integer iterations,
             Integer finalMapSize)
             throws InterruptedException {
-        final CountDownLatch latch = new CountDownLatch(1);
-        List<Thread> listOfThreads = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            Thread thread = new Thread(() -> {
-                try {
-                    latch.await();
-                    for (int j = 0; j < iterations; j++) {
-                        methodToTest.accept(j, j);
+            final CountDownLatch latch = new CountDownLatch(1);
+            List<Thread> listOfThreads = new ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                Thread thread = new Thread(() -> {
+                    try {
+                        latch.await();
+                        for (int j = 0; j < iterations; j++) {
+                            methodToTest.accept(j, j);
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
-            });
-            listOfThreads.add(thread);
-            thread.start();
-        }
-        latch.countDown();
-        for (Thread thread : listOfThreads) {
-            thread.join();
-        }
-        Assert.assertEquals(finalMapSize, finalMapSize);
-    }
+                });
+                listOfThreads.add(thread);
+                thread.start();
+            }
+            latch.countDown();
+            for (Thread thread : listOfThreads) {
+                thread.join();
+            }
+            Assert.assertEquals(finalMapSize, finalMapSize);
+            }
 
     @Test
     public void putAndRemove_threadSafety() throws InterruptedException {
@@ -126,6 +129,33 @@ public class TestConcurrentHashMapExpiringCache {
     }
 
     @Test
+    public void testGet_timeoutCondition_pastExpirationTime() {
+        ConcurrentMap<Integer, ExpiringCacheEntry<Integer, Integer>> mockMap = mock(ConcurrentMap.class);
+        ConcurrentHashMapExpiringCache<Integer, Integer> cache = new ConcurrentHashMapExpiringCache<>(mockMap);
+        when(mockMap.get(any(Integer.class))).thenReturn(new ExpiringCacheEntry<>(1, 1, 1L));
+        Assert.assertFalse(cache.get(1).isPresent());
+        cache.shutdown();
+    }
+
+    @Test
+    public void testGet_timeoutCondition_doNotExpire() {
+        ConcurrentMap<Integer, ExpiringCacheEntry<Integer, Integer>> mockMap = mock(ConcurrentMap.class);
+        ConcurrentHashMapExpiringCache<Integer, Integer> cache = new ConcurrentHashMapExpiringCache<>(mockMap);
+        when(mockMap.get(any(Integer.class))).thenReturn(new ExpiringCacheEntry<>(1, 1, ExpiringCacheEntry.DO_NOT_EXPIRE));
+        Assert.assertTrue(cache.get(1).isPresent());
+        cache.shutdown();
+    }
+
+    @Test
+    public void testGet_timeoutCondition_unexpired() {
+        ConcurrentMap<Integer, ExpiringCacheEntry<Integer, Integer>> mockMap = mock(ConcurrentMap.class);
+        ConcurrentHashMapExpiringCache<Integer, Integer> cache = new ConcurrentHashMapExpiringCache<>(mockMap);
+        when(mockMap.get(any(Integer.class))).thenReturn(new ExpiringCacheEntry<>(1, 1, System.currentTimeMillis() + 1000L));
+        Assert.assertTrue(cache.get(1).isPresent());
+        cache.shutdown();
+    }
+
+    @Test
     public void testDelete_withExpiringKey() throws InterruptedException {
         map.put(-413, -413, 1, TimeUnit.SECONDS);
         Assert.assertEquals(Long.valueOf(-413), Long.valueOf(map.get(-413).get()));
@@ -136,4 +166,3 @@ public class TestConcurrentHashMapExpiringCache {
     }
 
 }
-

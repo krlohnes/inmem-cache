@@ -11,7 +11,8 @@ public class PerformanceTests {
     public static class TestState {
         ConcurrentHashMapExpiringCache<Integer, Integer> cache;
 
-        public TestState() {}
+        public TestState() {
+        }
 
         @Setup(Level.Trial)
         public void createCache() {
